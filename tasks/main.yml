@@ -19,6 +19,16 @@
   with_items:         "{{ ubuntu_required_packages }}"
   tags:               install.packages
 
+- git_config:
+    name: user.email
+    scope: global
+    value: 'git.20.trinity32@spamgourmet.com'
+
+- git_config:
+    name: user.name
+    scope: global
+    value: "girlandhercode"
+
 - name: Clone oh-my-zsh repo
   git: repo=https://github.com/robbyrussell/oh-my-zsh.git dest=~/.oh-my-zsh
   become: no
@@ -42,3 +52,26 @@
   user: name={{ansible_user_id}} shell=/usr/bin/zsh
   become: yes
   when: ansible_lsb.codename == 'xenial'
+
+- name: Create 'Downloads' dir if it does not exist
+  file:
+    path: /home/{{ ansible_user_id }}/Downloads
+    state: directory
+    owner: "{{ ansible_user_id }}"
+    group: "{{ ansible_user_id }}"
+    mode: 0700
+
+# From: https://stackoverflow.com/a/26738019/2501386
+- name: Get url for latest version of fzf for linux
+  shell: curl -s https://api.github.com/repos/junegunn/fzf-bin/releases/latest | grep browser_download_url | grep 'linux_amd64.tgz' | cut -d '"' -f 4
+  register: fzf_url
+
+- name: Download fzf
+  get_url: "{{ fzf_url.stdout }}"
+  dest: /home/{{ ansible_user_id }}/Downloads
+
+- name: Unpack fzf
+  unarchive:
+    copy: no
+    src: "/home/{{ ansible_user_id }}/Downloads/{{ fzf_url.stdout | basename }}"
+    dest: /home/{{ ansible_user_id }}/Downloads
