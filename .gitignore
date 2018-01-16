@@ -1,0 +1,7 @@
+### Ansible ###
+*.retry
+.dev/
+.tmp/
+.vagrant/
+.DS_Store
+docker_inventory

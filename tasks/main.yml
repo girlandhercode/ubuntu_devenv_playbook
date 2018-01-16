@@ -1,0 +1,44 @@
+---
+- name: Install python for Ansible if needed
+  raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal python-zipstream)
+  become: yes
+  changed_when: False
+
+- name: Add git-core PPA repo
+  apt_repository:
+    repo: "{{ git_ppa }}"
+  update_cache: true
+
+- name:  Install required packages
+  apt:
+    name:             "{{ item }}"
+    update_cache:     yes
+    state:            present
+    cache_valid_time: 3600
+  become:             yes
+  with_items:         "{{ ubuntu_required_packages }}"
+  tags:               install.packages
+
+- name: Clone oh-my-zsh repo
+  git: repo=https://github.com/robbyrussell/oh-my-zsh.git dest=~/.oh-my-zsh
+  become: no
+
+- name: Determine whether ~/.zshrc exists
+  stat:
+      path: ~/.zshrc
+  register: zshrc_exists
+  become: no
+
+- name: Rename standard .zshrc
+  command: mv ~/.zshrc ~/.zshrc.OLD
+  when: zshrc_exists.stat.exists
+
+- name: Deploy .zshrc
+  template: src=zshrc.j2 dest=~/.zshrc
+  become: no
+  when: zshrc_exists.stat.exists == False
+
+- name: Set zsh as default shell (Ubuntu Xenial)
+  user: name={{ansible_user_id}} shell=/usr/bin/zsh
+  become: yes
+  when: ansible_lsb.codename == 'xenial'
