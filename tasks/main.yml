@@ -1,77 +1,124 @@
 ---
-- name: Install python for Ansible if needed
-  raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal python-zipstream)
-  become: yes
-  changed_when: False
 
-- name: Add git-core PPA repo
-  apt_repository:
-    repo: "{{ git_ppa }}"
-  update_cache: true
+# if running this from cli use following command:
+#  ansible-playbook main.yml --connection=local -e ansible_python_interpreter=/usr/bin/python3 --ask-sudo-pass --start-at-task="name of task" --check
 
-- name:  Install required packages
-  apt:
-    name:             "{{ item }}"
-    update_cache:     yes
-    state:            present
-    cache_valid_time: 3600
-  become:             yes
-  with_items:         "{{ ubuntu_required_packages }}"
-  tags:               install.packages
+- hosts: localhost
+  vars_files:
+    - ../defaults/main.yml
+  vars_prompt:
+    - name: "fzf_install_choice"
+      prompt: "Choose installation method for fzf. Enter 'git' or 'bin'"
+      default: "git"
+      private: no
+  tasks:
+    - name: Install python for Ansible if needed
+      raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal python-zipstream)
+      become: yes
+      changed_when: False
 
-- git_config:
-    name: user.email
-    scope: global
-    value: 'git.20.trinity32@spamgourmet.com'
+    - name: Add git-core PPA repo
+      apt_repository:
+        repo: "{{ git_ppa }}"
+      update_cache: true
 
-- git_config:
-    name: user.name
-    scope: global
-    value: "girlandhercode"
+    - name:  Install required packages
+      apt:
+        name:             "{{ item }}"
+        update_cache:     yes
+        state:            present
+        cache_valid_time: 3600
+      become:             yes
+      with_items:         "{{ ubuntu_required_packages }}"
+      tags:               install.packages
 
-- name: Clone oh-my-zsh repo
-  git: repo=https://github.com/robbyrussell/oh-my-zsh.git dest=~/.oh-my-zsh
-  become: no
+    - git_config:
+        name: user.email
+        scope: global
+        value: 'git.20.trinity32@spamgourmet.com'
 
-- name: Determine whether ~/.zshrc exists
-  stat:
-      path: ~/.zshrc
-  register: zshrc_exists
-  become: no
+    - git_config:
+        name: user.name
+        scope: global
+        value: "girlandhercode"
 
-- name: Rename standard .zshrc
-  command: mv ~/.zshrc ~/.zshrc.OLD
-  when: zshrc_exists.stat.exists
+    - name: Clone oh-my-zsh repo
+      git: repo=https://github.com/robbyrussell/oh-my-zsh.git dest=~/.oh-my-zsh
+      become: no
 
-- name: Deploy .zshrc
-  template: src=zshrc.j2 dest=~/.zshrc
-  become: no
-  when: zshrc_exists.stat.exists == False
+    - name: Determine whether ~/.zshrc exists
+      stat:
+          path: ~/.zshrc
+      register: zshrc_exists
+      become: no
 
-- name: Set zsh as default shell (Ubuntu Xenial)
-  user: name={{ansible_user_id}} shell=/usr/bin/zsh
-  become: yes
-  when: ansible_lsb.codename == 'xenial'
+    - name: Rename standard .zshrc
+      command: mv ~/.zshrc ~/.zshrc.OLD
+      when: zshrc_exists.stat.exists
 
-- name: Create 'Downloads' dir if it does not exist
-  file:
-    path: /home/{{ ansible_user_id }}/Downloads
-    state: directory
-    owner: "{{ ansible_user_id }}"
-    group: "{{ ansible_user_id }}"
-    mode: 0700
+    - name: Deploy .zshrc
+      template: src=zshrc.j2 dest=~/.zshrc
+      become: no
+      when: zshrc_exists.stat.exists == False
 
-# From: https://stackoverflow.com/a/26738019/2501386
-- name: Get url for latest version of fzf for linux
-  shell: curl -s https://api.github.com/repos/junegunn/fzf-bin/releases/latest | grep browser_download_url | grep 'linux_amd64.tgz' | cut -d '"' -f 4
-  register: fzf_url
+    - name: Set zsh as default shell (Ubuntu Xenial)
+      user: name={{ansible_user_id}} shell=/usr/bin/zsh
+      become: yes
+      when: ansible_lsb.codename == 'xenial'
 
-- name: Download fzf
-  get_url: "{{ fzf_url.stdout }}"
-  dest: /home/{{ ansible_user_id }}/Downloads
+    - name: Create 'Downloads' dir if it does not exist
+      file:
+        path: /home/{{ ansible_user_id }}/Downloads
+        state: directory
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+        mode: 0700
 
-- name: Unpack fzf
-  unarchive:
-    copy: no
-    src: "/home/{{ ansible_user_id }}/Downloads/{{ fzf_url.stdout | basename }}"
-    dest: /home/{{ ansible_user_id }}/Downloads
+
+
+#######################################################
+##### Install fzf executable without bash binds etc
+#######################################################
+
+    # Based on info in: https://stackoverflow.com/a/26738019/2501386
+    - name: Get url for latest version of fzf for linux
+      shell: curl -s https://api.github.com/repos/junegunn/fzf-bin/releases/latest | grep browser_download_url | grep 'linux_amd64.tgz' | cut -d '"' -f 4
+      register: fzf_url
+      when: ( fzf_install_choice == "bin" )
+
+    # - debug:
+    #     var: fzf_url.stdout
+
+    - name: Download fzf
+      get_url:
+        url: "{{ fzf_url.stdout }}"
+        dest: /home/{{ ansible_user_id }}/Downloads/{{ fzf_url.stdout | basename }}
+      when: ( fzf_install_choice == "bin" )
+
+    - name: Unpack fzf
+      unarchive:
+        copy: no
+        src: /home/{{ ansible_user_id }}/Downloads/{{ fzf_url.stdout | basename }}
+        dest: /home/{{ ansible_user_id }}/Downloads
+      when: ( fzf_install_choice == "bin" )
+
+############       OR      ###########################
+##### Install fzf via 'git clone' to include extras
+##### like keybinds in bash etc.
+######################################################
+
+    - name: Clone fzf repo
+      git:
+        repo: https://github.com/junegunn/fzf.git
+        dest: ~/.fzf
+        depth: 1
+      become: no
+
+  # TODO: Implement expect for questions asked during fzf install
+  # Need to escape special characters for regex
+  # Info here: https://stackoverflow.com/a/39458575/2501386
+  #  "Do you want to enable fuzzy auto-completion? ([y]/n)"
+  #  "Do you want to enable key bindings? ([y]/n)"
+  #  "Do you want to update your shell configuration files? ([y]/n)"
+
+  #  Then source ~/.zshrc
