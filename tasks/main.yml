@@ -4,23 +4,26 @@
 #  ansible-playbook main.yml --connection=local -e ansible_python_interpreter=/usr/bin/python3 --ask-sudo-pass --start-at-task="name of task" --check
 
 - hosts: localhost
+  # gather_facts: yes
   vars_files:
     - ../defaults/main.yml
-  vars_prompt:
-    - name: "fzf_install_choice"
-      prompt: "Choose installation method for fzf. Enter 'git' or 'bin'"
-      default: "git"
-      private: no
+  # vars_prompt:
+  #   - name: "fzf_install_choice"
+  #     prompt: "Choose installation method for fzf. Enter 'git' or 'bin'"
+  #     default: "git"
+  #     private: no
   tasks:
     - name: Install python for Ansible if needed
       raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal python-zipstream)
       become: yes
       changed_when: False
 
-    - name: Add git-core PPA repo
+    - name: Add PPAs
       apt_repository:
-        repo: "{{ git_ppa }}"
-      update_cache: true
+        repo: "{{ item }}"
+        state: present
+        update_cache: true
+      with_items: "{{ ubuntu_ppas }}"
 
     - name:  Install required packages
       apt:
@@ -74,8 +77,6 @@
         group: "{{ ansible_user_id }}"
         mode: 0700
 
-
-
 #######################################################
 ##### Install fzf executable without bash binds etc
 #######################################################
@@ -85,9 +86,6 @@
       shell: curl -s https://api.github.com/repos/junegunn/fzf-bin/releases/latest | grep browser_download_url | grep 'linux_amd64.tgz' | cut -d '"' -f 4
       register: fzf_url
       when: ( fzf_install_choice == "bin" )
-
-    # - debug:
-    #     var: fzf_url.stdout
 
     - name: Download fzf
       get_url:
@@ -110,12 +108,12 @@
     - name: Clone fzf repo
       git:
         repo: https://github.com/junegunn/fzf.git
-        dest: ~/.fzf
+        dest: /home/{{ ansible_user_id }}/.fzf
         depth: 1
       become: no
 
-  # TODO: Implement expect for questions asked during fzf install
-  
+  # WONTDO: Implement expect for questions asked during fzf install
+
   # Need to escape special characters for regex
   # Info here: https://stackoverflow.com/a/39458575/2501386
   #  "Do you want to enable fuzzy auto-completion? ([y]/n)"
@@ -123,3 +121,64 @@
   #  "Do you want to update your shell configuration files? ([y]/n)"
 
   #  Then source ~/.zshrc
+
+    - name: Install fzf
+      shell: /home/{{ ansible_user_id }}/.fzf/install --all --64 --key-bindings --completion --update-rc --no-fish
+
+######################################################
+##### Install Neovim plugin manager - 'vim-plug' - junegunn/vim-plug
+######################################################
+
+    - name: Ensure nvim conf dirs exist
+      file:
+        path: "{{ item }}"
+        state: directory
+      with_items:
+        - /home/{{ ansible_user_id }}/.local/share/nvim/site/autoload
+        - /home/{{ ansible_user_id }}/.config/nvim
+
+    - name: Download and install 'vim-plug'
+      get_url:
+        url: https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+        dest: /home/{{ ansible_user_id }}/.local/share/nvim/site/autoload/plug.vim
+
+    - name: Install nvim plugins
+      command: nvim +PlugInstall +qall --headless
+      changed_when: False
+
+#####################################################
+##### Manage ssh keys
+#####################################################
+
+# Keys must either already exist or be created by
+# https://github.com/girlandhercode/windows-development-environment
+
+    - name: Check for correct user's .ssh directory
+      copy:
+        src: /mnt/c/Users/{{ item }}/.ssh
+        dest: /home/{{ ansible_user_id }}/
+        # mode: 0700
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+      with_items:
+          - cnmill05
+      when: ansible_env.PATH | search('cnmill05')
+
+    - name: Change mode of .ssh dir
+      file:
+        path: /home/{{ ansible_user_id }}/.ssh
+        mode: 0700
+
+    - name: Change mode of all private ssh keys in .ssh
+      file:
+        path: "{{ item }}"
+        mode: 0600
+      with_fileglob:
+        - '/home/{{ ansible_user_id }}/.ssh/*id_rsa*'
+        - '/home/{{ ansible_user_id }}/.ssh/config'
+
+    - name: Change mode of all public keys in .ssh
+      file:
+        path: "{{ item }}"
+        mode: 0644
+      with_fileglob: '/home/{{ ansible_user_id }}/.ssh/*.pub'

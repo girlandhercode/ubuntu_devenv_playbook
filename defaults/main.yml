@@ -6,5 +6,8 @@ ubuntu_required_packages:
   - python-pip
   - zsh
   - git
+  - neovim
 
-git_ppa: 'ppa:git-core/ppa'
+ubuntu_ppas:
+  - ppa:git-core/ppa
+  - ppa:neovim-ppa/stable
