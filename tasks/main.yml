@@ -46,32 +46,54 @@
         value: "girlandhercode"
 
     - name: Clone oh-my-zsh repo
-      git: repo=https://github.com/robbyrussell/oh-my-zsh.git dest=~/.oh-my-zsh
+      git: repo=https://github.com/robbyrussell/oh-my-zsh.git dest=/home/{{ ansible_user_id }}/.oh-my-zsh
       become: no
+
+
+# From https://github.com/DennisdeBest/bolt_provision
+    - name: Ensure correct ownership and permissions of oh-my-zsh
+      become: no
+      file:
+        path: "/home/{{ ansible_user_id }}/.oh-my-zsh"
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+        # Prevent the cloned repository from having insecure permissions. Failing to do
+        # so causes compinit() calls to fail with "command not found: compdef" errors
+        # for users with insecure umasks (e.g., "002", allowing group writability).
+        mode: 'go-w'
+        recurse: yes
 
     - name: Determine whether ~/.zshrc exists
       stat:
-          path: ~/.zshrc
-      register: zshrc_exists
+          path: /home/{{ ansible_user_id }}/.zshrc
+      register: zshrc_file
       become: no
 
     - name: Rename standard .zshrc
-      command: mv ~/.zshrc ~/.zshrc.OLD
-      when: zshrc_exists.stat.exists
+      command: mv /home/{{ ansible_user_id }}/.zshrc /home/{{ ansible_user_id }}/.zshrc.OLD
+      when: zshrc_file.stat.exists
 
     - name: Deploy .zshrc
-      template: src=zshrc.j2 dest=~/.zshrc
+      template: src=zshrc.j2 dest=/home/{{ ansible_user_id }}/.zshrc
       become: no
-      when: zshrc_exists.stat.exists == False
+      when: zshrc_file.stat.exists == False
 
-    - name: Set zsh as default shell (Ubuntu Xenial)
+    - name: Set zsh as default shell
       user: name={{ansible_user_id}} shell=/usr/bin/zsh
       become: yes
-      when: ansible_lsb.codename == 'xenial'
+      # when: ansible_lsb.codename == 'xenial'
 
     - name: Create 'Downloads' dir if it does not exist
       file:
         path: /home/{{ ansible_user_id }}/Downloads
+        state: directory
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+        mode: 0700
+
+    - name: Create 'Projects' dir if it does not exist
+      file:
+        path: /home/{{ ansible_user_id }}/Projects
         state: directory
         owner: "{{ ansible_user_id }}"
         group: "{{ ansible_user_id }}"
@@ -100,9 +122,17 @@
         dest: /home/{{ ansible_user_id }}/Downloads
       when: ( fzf_install_choice == "bin" )
 
-############       OR      ###########################
+
+
+######################################################
+######################################################
+############             OR             ##############
+#####
 ##### Install fzf via 'git clone' to include extras
 ##### like keybinds in bash etc.
+#####
+######################################################
+######################################################
 ######################################################
 
     - name: Clone fzf repo
@@ -146,11 +176,15 @@
       command: nvim +PlugInstall +qall --headless
       changed_when: False
 
+
+
+
 #####################################################
-##### Manage ssh keys
+##### Manage ssh keys for WSL
 #####################################################
 
-# Keys must either already exist or be created by
+# # # # Keys must either already exist or be created by # # # #
+
 # https://github.com/girlandhercode/windows-development-environment
 
     - name: Check for correct user's .ssh directory
@@ -162,12 +196,13 @@
         group: "{{ ansible_user_id }}"
       with_items:
           - cnmill05
-      when: ansible_env.PATH | search('cnmill05')
+      when: (ansible_env.PATH | search('cnmill05')) and ('i7-6700K' in ansible_processor[0])
 
     - name: Change mode of .ssh dir
       file:
         path: /home/{{ ansible_user_id }}/.ssh
         mode: 0700
+      when: 'i7-6700K' in ansible_processor[0]
 
     - name: Change mode of all private ssh keys in .ssh
       file:
@@ -176,9 +211,63 @@
       with_fileglob:
         - '/home/{{ ansible_user_id }}/.ssh/*id_rsa*'
         - '/home/{{ ansible_user_id }}/.ssh/config'
+      when: 'i7-6700K' in ansible_processor[0]
 
     - name: Change mode of all public keys in .ssh
       file:
         path: "{{ item }}"
         mode: 0644
       with_fileglob: '/home/{{ ansible_user_id }}/.ssh/*.pub'
+      when: 'i7-6700K' in ansible_processor[0]
+
+
+#####################################################
+#####################################################
+#####################################################
+#####
+#####
+##### Manage ssh keys for Ubuntu
+#####
+#####
+#####################################################
+#####################################################
+#####################################################
+
+    - name: Check for correct user's .ssh directory
+      stat:
+        path: /home/{{ ansible_user_id }}/.ssh
+      register: ssh_dir
+      when: (ansible_distribution == 'Ubuntu') and ('i7-6700K' not in ansible_processor[0])
+
+    - name: Ensure correct mode of .ssh dir
+      file:
+        path: /home/{{ ansible_user_id }}/.ssh
+        mode: 0700
+        group: "{{ ansible_user_id }}"
+        owner: "{{ ansible_user_id }}"
+      when: ssh_dir.stat.exists and (ansible_distribution == 'Ubuntu') and ('i7-6700K' not in ansible_processor[0])
+
+    - name: Generate ssh keys
+      user:
+        name: "{{ ansible_user_id }}"
+        generate_ssh_key: yes
+        ssh_key_file: '/home/{{ ansible_user_id }}/.ssh/{{ user_ssh_key_file_service_name }}_id_rsa'
+      become: yes
+      register: deploy_user_key_created
+      when: ssh_dir.stat.exists and (ansible_distribution == 'Ubuntu') and ('i7-6700K' not in ansible_processor[0])
+
+    - name: Change mode of all private ssh keys and config files in .ssh
+      file:
+        path: "{{ item }}"
+        mode: 0600
+      with_fileglob:
+        - '/home/{{ ansible_user_id }}/.ssh/*id_rsa*'
+        - '/home/{{ ansible_user_id }}/.ssh/config'
+      when: ssh_dir.stat.exists and (ansible_distribution == 'Ubuntu') and ('i7-6700K' not in ansible_processor[0])
+
+    - name: Change mode of all public keys in .ssh
+      file:
+        path: "{{ item }}"
+        mode: 0644
+      with_fileglob: '/home/{{ ansible_user_id }}/.ssh/*.pub'
+      when: ssh_dir.stat.exists and (ansible_distribution == 'Ubuntu') and ('i7-6700K' not in ansible_processor[0])

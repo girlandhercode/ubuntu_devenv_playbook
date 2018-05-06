@@ -1,6 +1,11 @@
 ---
 # defaults file for Ubuntu_DevEnv_Setup_Playbook
 
+ubuntu_ppas:
+  - ppa:git-core/ppa
+  - ppa:neovim-ppa/stable
+
+
 ubuntu_required_packages:
   - software-properties-common
   - python-pip
@@ -8,6 +13,18 @@ ubuntu_required_packages:
   - git
   - neovim
 
-ubuntu_ppas:
-  - ppa:git-core/ppa
-  - ppa:neovim-ppa/stable
+
+
+oh_my_zsh_theme:
+  - lambda-mod
+
+oh_my_zsh_plugins:
+  - git
+  - fast-syntax-highlighting
+
+
+user_ssh_key_file_service_name:
+  - bitbucket_{{ ansible_nodename }}
+  - gahc_gitlab_{{ ansible_nodename }}
+  - gitlab_{{ ansible_nodename }}
+  - github_{{ ansible_nodename }}
