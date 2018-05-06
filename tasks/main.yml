@@ -3,7 +3,8 @@
 # if running this from cli use following command:
 #  ansible-playbook main.yml --connection=local -e ansible_python_interpreter=/usr/bin/python3 --ask-sudo-pass --start-at-task="name of task" --check
 
-- hosts: localhost
+# - hosts: localhost
+- hosts: all
   # gather_facts: yes
   vars_files:
     - ../defaults/main.yml
@@ -27,13 +28,13 @@
 
     - name:  Install required packages
       apt:
-        name:             "{{ item }}"
-        update_cache:     yes
-        state:            present
+        name: "{{ item }}"
+        update_cache: yes
+        state: present
         cache_valid_time: 3600
-      become:             yes
-      with_items:         "{{ ubuntu_required_packages }}"
-      tags:               install.packages
+      become: yes
+      with_items: "{{ ubuntu_required_packages }}"
+      tags: install.packages
 
     - git_config:
         name: user.email
@@ -46,22 +47,88 @@
         value: "girlandhercode"
 
     - name: Clone oh-my-zsh repo
-      git: repo=https://github.com/robbyrussell/oh-my-zsh.git dest=/home/{{ ansible_user_id }}/.oh-my-zsh
+      git:
+        repo: https://github.com/robbyrussell/oh-my-zsh.git
+        dest: /home/{{ ansible_user_id }}/.oh-my-zsh
+        depth: 1
       become: no
 
 
 # From https://github.com/DennisdeBest/bolt_provision
-    - name: Ensure correct ownership and permissions of oh-my-zsh
+    - name: Ensure correct ownership and permissions of ~/.oh-my-zsh
       become: no
       file:
         path: "/home/{{ ansible_user_id }}/.oh-my-zsh"
+        state: directory
         owner: "{{ ansible_user_id }}"
         group: "{{ ansible_user_id }}"
         # Prevent the cloned repository from having insecure permissions. Failing to do
         # so causes compinit() calls to fail with "command not found: compdef" errors
         # for users with insecure umasks (e.g., "002", allowing group writability).
-        mode: 'go-w'
+        # mode: 'go-w'
         recurse: yes
+
+
+
+######################################################
+######################################################
+########                                  ############
+########    oh-my-zsh themes & plugins    ############
+########                                  ############
+######################################################
+######################################################
+
+
+    - name: Determine whether ~/.oh-my-zsh/custom/themes exists
+      stat:
+          path: /home/{{ ansible_user_id }}/.oh-my-zsh/custom/themes
+      register: oh_my_zsh_themes_dir
+      become: no
+
+    - name: Create ~/.oh-my-zsh/custom/themes if it does not exist
+      file:
+        path: "/home/{{ ansible_user_id }}/.oh-my-zsh/custom/themes"
+        state: directory
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+      when: oh_my_zsh_themes_dir.stat.isdir is defined and oh_my_zsh_themes_dir.stat.isdir
+
+    - name: Download lambda-mod theme for oh-my-zsh
+      get_url:
+        url: https://raw.githubusercontent.com/halfo/lambda-mod-zsh-theme/master/lambda-mod.zsh-theme
+        dest: /home/{{ ansible_user_id }}/.oh-my-zsh/custom/themes/lambda-mod.zsh-theme
+
+
+
+
+
+
+
+    - name: Determine whether ~/.oh-my-zsh/custom/plugins exists
+      stat:
+          path: /home/{{ ansible_user_id }}/.oh-my-zsh/custom/plugins
+      register: oh_my_zsh_plugins_dir
+      become: no
+
+    - name: Create ~/.oh-my-zsh/custom/plugins if it does not exist
+      file:
+        path: "/home/{{ ansible_user_id }}/.oh-my-zsh/custom/plugins"
+        state: directory
+        owner: "{{ ansible_user_id }}"
+        group: "{{ ansible_user_id }}"
+      when: oh_my_zsh_plugins_dir.stat.isdir is defined and oh_my_zsh_plugins_dir.stat.isdir
+
+    - name: Download fast-syntax-highlighting for oh-my-zsh
+      git:
+        repo: https://github.com/zdharma/fast-syntax-highlighting.git
+        dest: /home/{{ ansible_user_id }}/.oh-my-zsh/custom/plugins
+        depth: 1
+
+
+
+
+
+
 
     - name: Determine whether ~/.zshrc exists
       stat:
@@ -74,7 +141,9 @@
       when: zshrc_file.stat.exists
 
     - name: Deploy .zshrc
-      template: src=zshrc.j2 dest=/home/{{ ansible_user_id }}/.zshrc
+      template:
+        src: zshrc.j2
+        dest: /home/{{ ansible_user_id }}/.zshrc
       become: no
       when: zshrc_file.stat.exists == False
 
@@ -104,23 +173,23 @@
 #######################################################
 
     # Based on info in: https://stackoverflow.com/a/26738019/2501386
-    - name: Get url for latest version of fzf for linux
-      shell: curl -s https://api.github.com/repos/junegunn/fzf-bin/releases/latest | grep browser_download_url | grep 'linux_amd64.tgz' | cut -d '"' -f 4
-      register: fzf_url
-      when: ( fzf_install_choice == "bin" )
+    # - name: Get url for latest version of fzf for linux
+    #   shell: curl -s https://api.github.com/repos/junegunn/fzf-bin/releases/latest | grep browser_download_url | grep 'linux_amd64.tgz' | cut -d '"' -f 4
+    #   register: fzf_url
+    #   when: ( fzf_install_choice == "bin" )
 
-    - name: Download fzf
-      get_url:
-        url: "{{ fzf_url.stdout }}"
-        dest: /home/{{ ansible_user_id }}/Downloads/{{ fzf_url.stdout | basename }}
-      when: ( fzf_install_choice == "bin" )
+    # - name: Download fzf
+    #   get_url:
+    #     url: "{{ fzf_url.stdout }}"
+    #     dest: /home/{{ ansible_user_id }}/Downloads/{{ fzf_url.stdout | basename }}
+    #   when: ( fzf_install_choice == "bin" )
 
-    - name: Unpack fzf
-      unarchive:
-        copy: no
-        src: /home/{{ ansible_user_id }}/Downloads/{{ fzf_url.stdout | basename }}
-        dest: /home/{{ ansible_user_id }}/Downloads
-      when: ( fzf_install_choice == "bin" )
+    # - name: Unpack fzf
+    #   unarchive:
+    #     copy: no
+    #     src: /home/{{ ansible_user_id }}/Downloads/{{ fzf_url.stdout | basename }}
+    #     dest: /home/{{ ansible_user_id }}/Downloads
+    #   when: ( fzf_install_choice == "bin" )
 
 
 
