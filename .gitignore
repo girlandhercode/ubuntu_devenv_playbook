@@ -6,3 +6,4 @@
 .DS_Store
 docker_inventory
 .vscode/
+*-console.log

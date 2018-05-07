@@ -271,7 +271,7 @@
       file:
         path: /home/{{ ansible_user_id }}/.ssh
         mode: 0700
-      when: 'i7-6700K' in ansible_processor[0]
+      when: "'i7-6700K' in ansible_processor[0]"
 
     - name: Change mode of all private ssh keys in .ssh
       file:
@@ -280,14 +280,14 @@
       with_fileglob:
         - '/home/{{ ansible_user_id }}/.ssh/*id_rsa*'
         - '/home/{{ ansible_user_id }}/.ssh/config'
-      when: 'i7-6700K' in ansible_processor[0]
+      when: "'i7-6700K' in ansible_processor[0]"
 
     - name: Change mode of all public keys in .ssh
       file:
         path: "{{ item }}"
         mode: 0644
       with_fileglob: '/home/{{ ansible_user_id }}/.ssh/*.pub'
-      when: 'i7-6700K' in ansible_processor[0]
+      when: "'i7-6700K' in ansible_processor[0]"
 
 
 #####################################################
