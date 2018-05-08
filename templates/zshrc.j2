@@ -1,4 +1,4 @@
-#TODO: implement zshrc template
+#DONE: implement zshrc template
 
 # {{ ansible_managed }}
 
@@ -10,7 +10,7 @@
 
 # Path to your oh-my-zsh installation.
 
-  export ZSH=/home/cnmill05/.oh-my-zsh
+  export ZSH=/home/{{ ansible_user_id }}/.oh-my-zsh
 
 
 
@@ -22,7 +22,7 @@
 
 # ZSH_THEME="robbyrussell"
 
-ZSH_THEME="{{ oh_my_zsh.theme | default(oh_my_zsh_theme) }}"
+ZSH_THEME="lambda-mod"
 
 
 

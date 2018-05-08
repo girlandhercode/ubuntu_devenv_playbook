@@ -1,0 +1,78 @@
+" {{ ansible_managed }}
+
+call plug#begin('~/.local/share/nvim/plugged')
+
+Plug 'scrooloose/nerdtree', { 'on':  'NERDTreeToggle' }
+Plug 'scrooloose/nerdcommenter'
+Plug 'vim-airline/vim-airline'
+Plug 'vim-airline/vim-airline-themes'
+Plug 'mhinz/vim-startify'
+Plug 'ryanoasis/vim-devicons'
+Plug 'reedes/vim-colors-pencil'
+Plug 'andbar-ru/vim-unicon'
+Plug 'badacadabra/vim-archery'
+
+call plug#end()
+
+
+set number
+set history=1000
+set undolevels=1000
+set mouse=a
+set backspace=indent,eol,start
+set hlsearch
+set incsearch
+set ignorecase smartcase
+set smartindent
+set smarttab
+set autoindent
+set background=dark
+"set clipboard=unnamedplus
+
+" Turn off the startup message
+"set shortmess=I
+
+
+
+let g:airline#extensions#tabline#left_sep = ' '
+let g:airline#extensions#tabline#left_alt_sep = '|'
+let g:airline#extensions#tabline#enabled = 1
+let g:airline_powerline_fonts = 1
+
+map <C-a> <esc>ggVG<CR>
+map <C-c> "+y
+map <C-n> :NERDTreeToggle<CR>
+
+augroup Nerdtree
+    au!
+    autocmd StdinReadPre * let s:std_in=1
+    autocmd VimEnter * if argc() == 0 && !exists("s:std_in") | NERDTree | endif
+    autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTree") && b:NERDTree.isTabTree()) | q | endif
+augroup END
+
+let g:NERDTreeShowLineNumbers = 1
+let g:NERDTreeWinPos = 'left'
+let g:NERDTreeShowHidden = 1
+let g:NERDTreeShowBookmarks = 1
+
+
+let g:pencil_gutter_color = 1
+"let g:pencil_highter_contrast_ui = 1
+
+"vim-airline themes that work on FX8350
+"murmur
+"simple
+"term
+"raven
+"behelit
+
+let g:airline_theme='kolor'
+"let g:airline_theme='pencil'
+
+colorscheme unicon
+"colorscheme pencil
+"colorscheme archery
+
+hi Normal guibg=NONE ctermbg=NONE
+
+" execute 'source' fnamemodify(expand('<sfile>'), ':h').'/config/main.vim'

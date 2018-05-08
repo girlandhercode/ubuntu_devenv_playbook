@@ -3,8 +3,8 @@
 # if running this from cli use following command:
 #  ansible-playbook main.yml --connection=local -e ansible_python_interpreter=/usr/bin/python3 --ask-sudo-pass --start-at-task="name of task" --check
 
-# - hosts: localhost
-- hosts: all
+- hosts: localhost
+# - hosts: all
   # gather_facts: yes
   vars_files:
     - ../defaults/main.yml
@@ -14,16 +14,48 @@
   #     default: "git"
   #     private: no
   tasks:
+    - name: Make sure we have a 'wheel' group
+      group:
+        name: wheel
+        state: present
+      become: yes
+      become_user: root
+      when: ansible_bios_version == "VirtualBox"
+
+    - name: Allow 'wheel' group to have passwordless sudo
+      lineinfile:
+        dest: /etc/sudoers
+        state: present
+        regexp: '^%wheel'
+        line: '%wheel ALL=(ALL) NOPASSWD: ALL'
+        validate: 'visudo -cf %s'
+      become: yes
+      become_user: root
+      when: ansible_bios_version == "VirtualBox"
+
+# DONE: Add password or figure out whats up in /etc/shadow for this user
+    - name: Add sudoers users to wheel group
+      user:
+        name: cnmill05
+        groups: wheel
+        append: yes
+        state: present
+      become: yes
+      become_user: root
+      when: ansible_bios_version == "VirtualBox"
+
     - name: Install python for Ansible if needed
       raw: test -e /usr/bin/python || (apt -y update && apt install -y python-minimal python-zipstream)
       become: yes
       changed_when: False
+      when: ansible_bios_version != "VirtualBox"
 
     - name: Add PPAs
       apt_repository:
         repo: "{{ item }}"
         state: present
         update_cache: true
+      become: yes
       with_items: "{{ ubuntu_ppas }}"
 
     - name:  Install required packages
@@ -46,17 +78,24 @@
         scope: global
         value: "girlandhercode"
 
+    - name: Check for .oh-my-zsh directory
+      stat:
+        path: /home/{{ ansible_user_id }}/.oh-my-zsh
+      register: oh_my_zsh_dir
+      when: ansible_distribution == 'Ubuntu' and 'i7-6700K' not in ansible_processor[0]
+
+
     - name: Clone oh-my-zsh repo
       git:
         repo: https://github.com/robbyrussell/oh-my-zsh.git
         dest: /home/{{ ansible_user_id }}/.oh-my-zsh
         depth: 1
-      become: no
+      when: oh_my_zsh_dir.stat.exists == false and oh_my_zsh_dir.stat.isdir is not defined
 
 
 # From https://github.com/DennisdeBest/bolt_provision
     - name: Ensure correct ownership and permissions of ~/.oh-my-zsh
-      become: no
+      # become: no
       file:
         path: "/home/{{ ansible_user_id }}/.oh-my-zsh"
         state: directory
@@ -93,10 +132,17 @@
         group: "{{ ansible_user_id }}"
       when: oh_my_zsh_themes_dir.stat.isdir is defined and oh_my_zsh_themes_dir.stat.isdir
 
+
+    - name: Determine state of lambda-mod
+      stat:
+        path: /home/{{ ansible_user_id }}/.oh-my-zsh/custom/themes/lambda-mod.zsh-theme
+      register: lambda_mod_file
+
     - name: Download lambda-mod theme for oh-my-zsh
       get_url:
         url: https://raw.githubusercontent.com/halfo/lambda-mod-zsh-theme/master/lambda-mod.zsh-theme
         dest: /home/{{ ansible_user_id }}/.oh-my-zsh/custom/themes/lambda-mod.zsh-theme
+      when:  lambda_mod_file.stat.exists == false
 
 
 
@@ -118,12 +164,17 @@
         group: "{{ ansible_user_id }}"
       when: oh_my_zsh_plugins_dir.stat.isdir is defined and oh_my_zsh_plugins_dir.stat.isdir
 
+    - name: Determine state of fast-syntax-highlighting
+      stat:
+        path: /home/{{ ansible_user_id }}/.oh-my-zsh/custom/plugins/fast-syntax-highlighting
+      register: fast_syntax_highlighting_dir
+
     - name: Download fast-syntax-highlighting for oh-my-zsh
       git:
         repo: https://github.com/zdharma/fast-syntax-highlighting.git
-        dest: /home/{{ ansible_user_id }}/.oh-my-zsh/custom/plugins
+        dest: /home/{{ ansible_user_id }}/.oh-my-zsh/custom/plugins/fast-syntax-highlighting
         depth: 1
-
+      when: fast_syntax_highlighting_dir.stat.isdir is defined and fast_syntax_highlighting_dir.stat.isdir == false
 
 
 
@@ -138,14 +189,22 @@
 
     - name: Rename standard .zshrc
       command: mv /home/{{ ansible_user_id }}/.zshrc /home/{{ ansible_user_id }}/.zshrc.OLD
-      when: zshrc_file.stat.exists
+      args:
+        creates: /home/{{ ansible_user_id }}/.zshrc.OLD
+      when: zshrc_file.stat.exists == true
+
+    - name: Determine whether ~/.zshrc.OLD exists
+      stat:
+          path: /home/{{ ansible_user_id }}/.zshrc.OLD
+      register: zshrc_OLD_file
+      become: no
 
     - name: Deploy .zshrc
       template:
-        src: zshrc.j2
+        src: ../templates/zshrc.j2
         dest: /home/{{ ansible_user_id }}/.zshrc
       become: no
-      when: zshrc_file.stat.exists == False
+      when: zshrc_OLD_file.stat.exists == true
 
     - name: Set zsh as default shell
       user: name={{ansible_user_id}} shell=/usr/bin/zsh
@@ -204,12 +263,24 @@
 ######################################################
 ######################################################
 
+    # - name: Determine fzf install status
+    #   shell: which fzf
+    #   register: which_fzf
+    #   become: no
+    #   ignore_errors: true
+
+    - name: Check for .fzf directory
+      stat:
+        path: /home/{{ ansible_user_id }}/.fzf
+      register: fzf_dir
+
     - name: Clone fzf repo
       git:
         repo: https://github.com/junegunn/fzf.git
         dest: /home/{{ ansible_user_id }}/.fzf
         depth: 1
       become: no
+      when: fzf_dir.stat.exists == false and fzf_dir.stat.isdir is not defined
 
   # WONTDO: Implement expect for questions asked during fzf install
 
@@ -222,7 +293,10 @@
   #  Then source ~/.zshrc
 
     - name: Install fzf
-      shell: /home/{{ ansible_user_id }}/.fzf/install --all --64 --key-bindings --completion --update-rc --no-fish
+      command: /home/{{ ansible_user_id }}/.fzf/install --all --64 --key-bindings --completion --update-rc --no-fish
+      args:
+        creates: /home/{{ ansible_user_id }}/.fzf/bin/fzf
+      # when:  which_fzf.rc != 0
 
 ######################################################
 ##### Install Neovim plugin manager - 'vim-plug' - junegunn/vim-plug
@@ -236,16 +310,52 @@
         - /home/{{ ansible_user_id }}/.local/share/nvim/site/autoload
         - /home/{{ ansible_user_id }}/.config/nvim
 
+    - name: Determine whether vim-plug is installed
+      stat:
+          path: /home/{{ ansible_user_id }}/.local/share/nvim/site/autoload/plug.vim
+      register: plug_vim_file
+      become: no
+
     - name: Download and install 'vim-plug'
       get_url:
         url: https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
         dest: /home/{{ ansible_user_id }}/.local/share/nvim/site/autoload/plug.vim
+      when: plug_vim_file.stat.exists == false
+
+    - name: Determine whether ~/.config/nvim/init.vim exists
+      stat:
+          path: /home/{{ ansible_user_id }}/.config/nvim/init.vim
+      register: init_vim_file
+      become: no
+
+    - debug:
+        var: init_vim_file
+
+    - name: Rename standard init.vim
+      command: mv /home/{{ ansible_user_id }}/.config/nvim/init.vim /home/{{ ansible_user_id }}/init.vim.OLD
+      args:
+        creates: /home/{{ ansible_user_id }}/init.vim.OLD
+      when: init_vim_file.stat.exists == true
+
+    - name: Determine whether ~/init.vim.OLD exists
+      stat:
+          path: /home/{{ ansible_user_id }}/init.vim.OLD
+      register: init_vim_OLD_file
+      become: no
+
+    - debug:
+        var: init_vim_OLD_file
+
+    - name: Deploy init.vim
+      template:
+        src: ../templates/init.vim.j2
+        dest: /home/{{ ansible_user_id }}/.config/nvim/init.vim
+      become: no
+      when: init_vim_file.stat.exists == false or init_vim_OLD_file.stat.exists == true
 
     - name: Install nvim plugins
       command: nvim +PlugInstall +qall --headless
       changed_when: False
-
-
 
 
 #####################################################
@@ -306,7 +416,7 @@
       stat:
         path: /home/{{ ansible_user_id }}/.ssh
       register: ssh_dir
-      when: (ansible_distribution == 'Ubuntu') and ('i7-6700K' not in ansible_processor[0])
+      when: ansible_distribution == 'Ubuntu' and 'i7-6700K' not in ansible_processor[0]
 
     - name: Ensure correct mode of .ssh dir
       file:
@@ -316,27 +426,58 @@
         owner: "{{ ansible_user_id }}"
       when: ssh_dir.stat.exists and (ansible_distribution == 'Ubuntu') and ('i7-6700K' not in ansible_processor[0])
 
+
+    # - name: Get a list of existing keys
+    #   # find:  
+    #   #   paths: /home/{{ ansible_user_id }}/.ssh/
+    #   #   patterns: '*_id_rsa'
+    #   shell: ls /home/{{ ansible_user_id }}/.ssh
+    #   register: priv_keys
+    #   tags: file_check
+
+    # - set_fact:
+    #     keys: "{{ lookup('fileglob','/home/{{ ansible_user_id }}/.ssh/*_id_rsa', wantlist=true) | reject('search','.pub') | list }}"
+
+    # - debug:
+    #     var: keys[ {{ item }}] | basename
+    #   with_sequence: start=0 end=3
+
+
+    # - debug:
+    #     var: "{{ item }}"
+    #   with_indexed_tems: "{{ keys }}" 
+    #   # with_sequence: start=0 end=3
+    #   # register: existing_key_list
+    #   tags: file_check
+
+
     - name: Generate ssh keys
       user:
         name: "{{ ansible_user_id }}"
         generate_ssh_key: yes
-        ssh_key_file: '/home/{{ ansible_user_id }}/.ssh/{{ user_ssh_key_file_service_name }}_id_rsa'
+        ssh_key_file: '/home/{{ ansible_user_id }}/.ssh/{{ item }}_id_rsa'
       become: yes
+      with_items:
+        - "{{ user_ssh_priv_key_file_service_name }}"
       register: deploy_user_key_created
-      when: ssh_dir.stat.exists and (ansible_distribution == 'Ubuntu') and ('i7-6700K' not in ansible_processor[0])
+      when: ssh_dir.stat.exists and ansible_distribution == 'Ubuntu' and 'i7-6700K' not in ansible_processor[0]
 
     - name: Change mode of all private ssh keys and config files in .ssh
       file:
         path: "{{ item }}"
         mode: 0600
+      # with_items:
+        # - "{{ user_ssh_priv_key_file_service_name }}"
+        # - '/home/{{ ansible_user_id }}/.ssh/config'
       with_fileglob:
-        - '/home/{{ ansible_user_id }}/.ssh/*id_rsa*'
+        - '/home/{{ ansible_user_id }}/.ssh/*id_rsa'
         - '/home/{{ ansible_user_id }}/.ssh/config'
-      when: ssh_dir.stat.exists and (ansible_distribution == 'Ubuntu') and ('i7-6700K' not in ansible_processor[0])
+      # when: item not in priv_keys.stdout_lines
+      when: ssh_dir.stat.exists and ansible_distribution == 'Ubuntu' and 'i7-6700K' not in ansible_processor[0]
 
     - name: Change mode of all public keys in .ssh
       file:
         path: "{{ item }}"
         mode: 0644
       with_fileglob: '/home/{{ ansible_user_id }}/.ssh/*.pub'
-      when: ssh_dir.stat.exists and (ansible_distribution == 'Ubuntu') and ('i7-6700K' not in ansible_processor[0])
+      when: ssh_dir.stat.exists and ansible_distribution == 'Ubuntu' and 'i7-6700K' not in ansible_processor[0]

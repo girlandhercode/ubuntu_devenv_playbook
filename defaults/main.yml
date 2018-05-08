@@ -23,8 +23,14 @@ oh_my_zsh_plugins:
   - fast-syntax-highlighting
 
 
-user_ssh_key_file_service_name:
+user_ssh_priv_key_file_service_name:
   - bitbucket_{{ ansible_nodename }}
   - gahc_gitlab_{{ ansible_nodename }}
   - gitlab_{{ ansible_nodename }}
   - github_{{ ansible_nodename }}
+
+user_ssh_pub_key_file_service_name:
+  - bitbucket_{{ ansible_nodename }}_id_rsa.pub
+  - gahc_gitlab_{{ ansible_nodename }}_id_rsa.pub
+  - github_{{ ansible_nodename }}_id_rsa.pub
+  - gitlab_{{ ansible_nodename }}_id_rsa.pub
