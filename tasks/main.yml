@@ -82,7 +82,8 @@
       stat:
         path: /home/{{ ansible_user_id }}/.oh-my-zsh
       register: oh_my_zsh_dir
-      when: ansible_distribution == 'Ubuntu' and 'i7-6700K' not in ansible_processor[0]
+      when: ansible_distribution == 'Ubuntu'
+      # and 'i7-6700K' not in ansible_processor[0]
 
 
     - name: Clone oh-my-zsh repo
@@ -204,10 +205,12 @@
         src: ../templates/zshrc.j2
         dest: /home/{{ ansible_user_id }}/.zshrc
       become: no
-      when: zshrc_OLD_file.stat.exists == true
+      when: zshrc_OLD_file.stat.exists == true or zshrc_file.stat.exists == false
 
     - name: Set zsh as default shell
-      user: name={{ansible_user_id}} shell=/usr/bin/zsh
+      user:
+        name: "{{ ansible_user_id }}"
+        shell: /usr/bin/zsh
       become: yes
       # when: ansible_lsb.codename == 'xenial'
 
@@ -280,7 +283,7 @@
         dest: /home/{{ ansible_user_id }}/.fzf
         depth: 1
       become: no
-      when: fzf_dir.stat.exists == false and fzf_dir.stat.isdir is not defined
+      # when: fzf_dir.stat.exists == false and fzf_dir.stat.isdir is not defined
 
   # WONTDO: Implement expect for questions asked during fzf install
 
@@ -291,6 +294,14 @@
   #  "Do you want to update your shell configuration files? ([y]/n)"
 
   #  Then source ~/.zshrc
+
+
+# CRLF line ending removal from: https://stackoverflow.com/a/38284292/2501386
+    # - name: Replace CRLF line endings when running under WSL
+    #   replace:
+    #     path: /home/{{ ansible_user_id }}.fzf/install
+    #     regexp: "\r"
+    #   when: ansible_distribution == 'Ubuntu' and 'i7-6700K' in ansible_processor[1]
 
     - name: Install fzf
       command: /home/{{ ansible_user_id }}/.fzf/install --all --64 --key-bindings --completion --update-rc --no-fish
@@ -366,38 +377,38 @@
 
 # https://github.com/girlandhercode/windows-development-environment
 
-    - name: Check for correct user's .ssh directory
-      copy:
-        src: /mnt/c/Users/{{ item }}/.ssh
-        dest: /home/{{ ansible_user_id }}/
-        # mode: 0700
-        owner: "{{ ansible_user_id }}"
-        group: "{{ ansible_user_id }}"
-      with_items:
-          - cnmill05
-      when: (ansible_env.PATH | search('cnmill05')) and ('i7-6700K' in ansible_processor[0])
+    # - name: Check for correct user's .ssh directory
+    #   copy:
+    #     src: /mnt/c/Users/{{ item }}/.ssh
+    #     dest: /home/{{ ansible_user_id }}/
+    #     # mode: 0700
+    #     owner: "{{ ansible_user_id }}"
+    #     group: "{{ ansible_user_id }}"
+    #   with_items:
+    #       - cnmill05
+    #   when: (ansible_env.PATH | search('cnmill05')) and ('i7-6700K' in ansible_processor[0])
 
-    - name: Change mode of .ssh dir
-      file:
-        path: /home/{{ ansible_user_id }}/.ssh
-        mode: 0700
-      when: "'i7-6700K' in ansible_processor[0]"
+    # - name: Change mode of .ssh dir
+    #   file:
+    #     path: /home/{{ ansible_user_id }}/.ssh
+    #     mode: 0700
+    #   when: "'i7-6700K' in ansible_processor[0]"
 
-    - name: Change mode of all private ssh keys in .ssh
-      file:
-        path: "{{ item }}"
-        mode: 0600
-      with_fileglob:
-        - '/home/{{ ansible_user_id }}/.ssh/*id_rsa*'
-        - '/home/{{ ansible_user_id }}/.ssh/config'
-      when: "'i7-6700K' in ansible_processor[0]"
+    # - name: Change mode of all private ssh keys in .ssh
+    #   file:
+    #     path: "{{ item }}"
+    #     mode: 0600
+    #   with_fileglob:
+    #     - '/home/{{ ansible_user_id }}/.ssh/*id_rsa*'
+    #     - '/home/{{ ansible_user_id }}/.ssh/config'
+    #   when: "'i7-6700K' in ansible_processor[0]"
 
-    - name: Change mode of all public keys in .ssh
-      file:
-        path: "{{ item }}"
-        mode: 0644
-      with_fileglob: '/home/{{ ansible_user_id }}/.ssh/*.pub'
-      when: "'i7-6700K' in ansible_processor[0]"
+    # - name: Change mode of all public keys in .ssh
+    #   file:
+    #     path: "{{ item }}"
+    #     mode: 0644
+    #   with_fileglob: '/home/{{ ansible_user_id }}/.ssh/*.pub'
+    #   when: "'i7-6700K' in ansible_processor[0]"
 
 
 #####################################################
@@ -405,7 +416,8 @@
 #####################################################
 #####
 #####
-##### Manage ssh keys for Ubuntu
+##### Manage ssh keys for Ubuntu AND WSL -
+#####    REFACTORED from above
 #####
 #####
 #####################################################
@@ -416,7 +428,8 @@
       stat:
         path: /home/{{ ansible_user_id }}/.ssh
       register: ssh_dir
-      when: ansible_distribution == 'Ubuntu' and 'i7-6700K' not in ansible_processor[0]
+      when: ansible_distribution == 'Ubuntu'
+      # and 'i7-6700K' not in ansible_processor[0]
 
     - name: Ensure correct mode of .ssh dir
       file:
@@ -424,7 +437,9 @@
         mode: 0700
         group: "{{ ansible_user_id }}"
         owner: "{{ ansible_user_id }}"
-      when: ssh_dir.stat.exists and (ansible_distribution == 'Ubuntu') and ('i7-6700K' not in ansible_processor[0])
+        state: directory
+      when: ssh_dir.stat.exists and ansible_distribution == 'Ubuntu'
+      #  and ('i7-6700K' not in ansible_processor[0])
 
 
     # - name: Get a list of existing keys
@@ -460,7 +475,8 @@
       with_items:
         - "{{ user_ssh_priv_key_file_service_name }}"
       register: deploy_user_key_created
-      when: ssh_dir.stat.exists and ansible_distribution == 'Ubuntu' and 'i7-6700K' not in ansible_processor[0]
+      when: ssh_dir.stat.exists and ansible_distribution == 'Ubuntu'
+      # and 'i7-6700K' not in ansible_processor[0]
 
     - name: Change mode of all private ssh keys and config files in .ssh
       file:
@@ -473,11 +489,13 @@
         - '/home/{{ ansible_user_id }}/.ssh/*id_rsa'
         - '/home/{{ ansible_user_id }}/.ssh/config'
       # when: item not in priv_keys.stdout_lines
-      when: ssh_dir.stat.exists and ansible_distribution == 'Ubuntu' and 'i7-6700K' not in ansible_processor[0]
+      when: ssh_dir.stat.exists and ansible_distribution == 'Ubuntu'
+      # and 'i7-6700K' not in ansible_processor[0]
 
     - name: Change mode of all public keys in .ssh
       file:
         path: "{{ item }}"
         mode: 0644
       with_fileglob: '/home/{{ ansible_user_id }}/.ssh/*.pub'
-      when: ssh_dir.stat.exists and ansible_distribution == 'Ubuntu' and 'i7-6700K' not in ansible_processor[0]
+      when: ssh_dir.stat.exists and ansible_distribution == 'Ubuntu'
+      # and 'i7-6700K' not in ansible_processor[0]
