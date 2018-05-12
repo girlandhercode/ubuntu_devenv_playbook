@@ -74,6 +74,11 @@
         value: 'git.20.trinity32@spamgourmet.com'
 
     - git_config:
+        name: core.autocrlf
+        scope: global
+        value: false
+
+    - git_config:
         name: user.name
         scope: global
         value: "girlandhercode"
@@ -283,7 +288,7 @@
         dest: /home/{{ ansible_user_id }}/.fzf
         depth: 1
       become: no
-      # when: fzf_dir.stat.exists == false and fzf_dir.stat.isdir is not defined
+      when: fzf_dir.stat.exists == false and fzf_dir.stat.isdir is not defined
 
   # WONTDO: Implement expect for questions asked during fzf install
 
