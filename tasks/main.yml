@@ -3,6 +3,38 @@
 # if running this from cli use following command:
 #  ansible-playbook main.yml --connection=local -e ansible_python_interpreter=/usr/bin/python3 --ask-sudo-pass --start-at-task="name of task" --check
 
+#TODO: Update content organization to best practices:
+# From: https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html#alternative-directory-layout
+
+# inventories/
+#    prod/
+#       hosts               # inventory file for prod servers
+#       group_vars/
+#          group1.yml       # assign vars to particular groups
+#          group2.yml
+#       host_vars/
+#          hostname1.yml    # assign vars to particular systems
+#          hostname2.yml
+# 
+#    test/
+#       hosts               # inventory file for test
+#       group_vars/
+#          group1.yml       # assign vars to particular groups
+#          group2.yml
+#       host_vars/
+#          stagehost1.yml   # assign vars to particular systems
+#          stagehost2.yml
+# 
+# site.yml
+# webservers.yml
+# dbservers.yml
+# 
+# roles/
+#     common/
+#     webtier/
+#     monitoring/
+#     fooapp/
+
 #TODO: Add molecule testing capabilities
 
 #TODO: Add ansible.cfg:
@@ -31,8 +63,8 @@
   # gather_facts: yes
   # include_vars:
   #   - none
-  vars_files:
-    - ../defaults/main.yml
+  # vars_files:
+  #   - ../defaults/main.yml
   # vars_prompt:
   #   - name: "fzf_install_choice"
   #     prompt: "Choose installation method for fzf. Enter 'git' or 'bin'"
