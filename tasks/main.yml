@@ -3,9 +3,34 @@
 # if running this from cli use following command:
 #  ansible-playbook main.yml --connection=local -e ansible_python_interpreter=/usr/bin/python3 --ask-sudo-pass --start-at-task="name of task" --check
 
+#TODO: Add molecule testing capabilities
+
+#TODO: Add ansible.cfg:
+  # From: https://robertdebock.nl/how-to-use-these-roles.html
+  # [defaults]
+  # roles_path=roles
+  # retry_files_enabled=no
+  # inventory=inventory
+
+
+#TODO: create global .gitignore:
+  # example: https://github.com/jdambron/dotfiles/blob/master/private_dot_gitignore_global
+
+#TODO: create requirements.yml to use other roles:
+  # https://github.com/gantsign/ansible-role-oh-my-zsh
+  # https://github.com/Oefenweb/ansible-virtualbox
+  # OR
+  # https://github.com/alvistack/ansible-role-virtualbox
+  # https://github.com/Oefenweb/ansible-vagrant
+  # https://github.com/geerlingguy/ansible-role-pip
+  # https://github.com/geerlingguy/ansible-role-docker
+
+
 - hosts: localhost
 # - hosts: all
   # gather_facts: yes
+  # include_vars:
+  #   - none
   vars_files:
     - ../defaults/main.yml
   # vars_prompt:

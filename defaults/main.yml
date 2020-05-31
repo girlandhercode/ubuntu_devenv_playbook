@@ -1,11 +1,14 @@
 ---
+
 # defaults file for Ubuntu_DevEnv_Setup_Playbook
 
+#TODO: Update which ppas to install
 ubuntu_ppas:
   - ppa:git-core/ppa
   - ppa:neovim-ppa/stable
 
 
+#TODO: Update required packages
 ubuntu_required_packages:
   - software-properties-common
   - python-pip
@@ -15,14 +18,17 @@ ubuntu_required_packages:
 
 
 
+#TODO: Update oh_my_zsh themes to install
 oh_my_zsh_theme:
   - lambda-mod
 
+#TODO: update which plugins to install
 oh_my_zsh_plugins:
   - git
   - fast-syntax-highlighting
 
 
+#TODO: Update all key info
 user_ssh_priv_key_file_service_name:
   - bitbucket_{{ ansible_nodename }}
   - gahc_gitlab_{{ ansible_nodename }}
