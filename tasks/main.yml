@@ -8,21 +8,21 @@
 
 # inventories/
 #    prod/
-#       hosts               # inventory file for prod servers
+#       hosts              # inventory file for prod servers
 #       group_vars/
-#          group1.yml       # assign vars to particular groups
+#          group1.yml      # assign vars to particular groups
 #          group2.yml
 #       host_vars/
-#          hostname1.yml    # assign vars to particular systems
+#          hostname1.yml   # assign vars to particular systems
 #          hostname2.yml
 # 
 #    test/
-#       hosts               # inventory file for test
+#       hosts              # inventory file for test
 #       group_vars/
-#          group1.yml       # assign vars to particular groups
+#          group1.yml      # assign vars to particular groups
 #          group2.yml
 #       host_vars/
-#          stagehost1.yml   # assign vars to particular systems
+#          stagehost1.yml  # assign vars to particular systems
 #          stagehost2.yml
 # 
 # site.yml
