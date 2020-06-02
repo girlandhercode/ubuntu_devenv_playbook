@@ -61,8 +61,8 @@
 - hosts: localhost
 # - hosts: all
   # gather_facts: yes
-  # include_vars:
-  #   - none
+  include_vars:
+    - ../defaults/main.yml
   # vars_files:
   #   - ../defaults/main.yml
   # vars_prompt:
